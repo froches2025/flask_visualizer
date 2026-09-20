@@ -99,27 +99,53 @@ ALGOS = {
     'nested_loops': nested_loops
 }
 
+# Complexity mapping for extra fields shown in the image
+COMPLEXITIES = {
+    'linear_search': 'O(n)',
+    'bubble_sort': 'O(n^2)',
+    'binary_search': 'O(log n)',
+    'nested_loops': 'O(n^2)'
+}
+
+PRETTY_NAMES = {
+    'linear_search': 'Linear Search',
+    'bubble_sort': 'Bubble Sort',
+    'binary_search': 'Binary Search',
+    'nested_loops': 'Nested Loops'
+}
+
 @app.route('/analyze', methods=['GET'])
 def analyze():
-    algorithm_name = request.args.get('algorithm')
+    algo_name = request.args.get('algo')
     try:
         step = int(request.args.get('step', 100))
         n_max = int(request.args.get('n_max', 10000))
     except ValueError:
         return jsonify({'error': 'Invalid step or n_max value. Please provide valid integers.'}), 400
     
-    if algorithm_name not in ALGOS:
-        return jsonify({'error': f'Algorithm "{algorithm_name}" not supported. Available algorithms: {list(ALGOS.keys())}'}), 400
+    if algo_name not in ALGOS:
+        return jsonify({'error': f'Algorithm "{algo_name}" not supported. Available algorithms: {list(ALGOS.keys())}'}), 400
     
     n_min = 0
     
-    filepath, base64_img = time_complexity_visualizer(ALGOS[algorithm_name], n_min, n_max, step)
+    start_time = int(time.time())
+    t_start_perf = time.perf_counter()
+    
+    filepath, base64_img = time_complexity_visualizer(ALGOS[algo_name], n_min, n_max, step)
+    
+    t_end_perf = time.perf_counter()
+    end_time = int(time.time())
+    total_time_ms = int((t_end_perf - t_start_perf) * 1000)
+
     return jsonify({
-        'algorithm': algorithm_name,
-        'step': step,
-        'n_max': n_max,
-        'local_path': filepath,
-        'base64_image': base64_img
+        'algo': PRETTY_NAMES.get(algo_name, algo_name),
+        'end_time': end_time,
+        'graph_base64': f"data:image/png;base64,{base64_img}",
+        'items': n_max,
+        'start_time': start_time,
+        'steps': step,
+        'time_complexity': COMPLEXITIES.get(algo_name, 'O(n)'),
+        'total_time_ms': total_time_ms
     })
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000, debug=True)
