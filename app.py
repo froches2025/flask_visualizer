@@ -4,6 +4,8 @@ import os
 import time
 import numpy
 import matplotlib
+
+from data_structures import Stack, Queue
 matplotlib.use('Agg') # interactive backend
 import matplotlib.pyplot as plt
 from flask import Flask, jsonify, request
@@ -92,11 +94,49 @@ def nested_loops(n):
             total += i * j
     return total
 
+def list_algo(n):
+    users = [{'id': i} for i in range(n)]
+    seen_ids = set()
+
+    for user in users:
+        seen_ids.add(user['id'])
+
+    return len(seen_ids)
+
+# def list_algo(n):
+#     users = [{'id': i} for i in range(n)]
+#     unique_users = []
+#     for user in users:
+#         seen = False
+#         for existing_user in unique_users:
+#             if user['id'] == existing_user['id']:
+#                 seen = True
+#                 break
+#         if not seen:
+#             unique_users.append(user)
+#     return len(unique_users)
+
+def benchmark_stack_push(n):
+    stack = Stack()
+    for i in range(n):
+        stack.push(i)
+    return stack.size()
+
+def benchmark_queue_enqueue(n):
+    queue = Queue()
+    for i in range (n):
+        queue.enqueue(i)
+    return queue.size()
+
+
 ALGOS = {
     'linear_search': linear_search,
     'bubble_sort': bubble_sort,
     'binary_search': binary_search,
-    'nested_loops': nested_loops
+    'list_algo': list_algo,
+    'nested_loops': nested_loops,
+    'stack_push': benchmark_stack_push,
+    'queue_enqueue': benchmark_queue_enqueue
 }
 
 # Complexity mapping for extra fields shown in the image
@@ -104,14 +144,20 @@ COMPLEXITIES = {
     'linear_search': 'O(n)',
     'bubble_sort': 'O(n^2)',
     'binary_search': 'O(log n)',
-    'nested_loops': 'O(n^2)'
+    'nested_loops': 'O(n^2)',
+    'list_algo': 'O(n^2)',
+    'stack_push': 'O(n)',
+    'queue_enqueue': 'O(n)'
 }
 
 PRETTY_NAMES = {
     'linear_search': 'Linear Search',
     'bubble_sort': 'Bubble Sort',
     'binary_search': 'Binary Search',
-    'nested_loops': 'Nested Loops'
+    'nested_loops': 'Nested Loops',
+    'list_algo': 'List Algorithm',
+    'stack_push': 'Stack Push',
+    'queue_enqueue': 'Queue Enqueue'
 }
 
 @app.route('/analyze', methods=['GET'])
