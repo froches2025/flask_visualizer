@@ -1,0 +1,9 @@
+[
+  {
+    "algo": "Linear Search",
+    "steps": 10,
+    "items": 1000,
+    "time_complexity": "O(n)",
+    "total_time_ms": 25
+  }
+]

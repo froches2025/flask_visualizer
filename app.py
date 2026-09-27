@@ -4,17 +4,45 @@ import os
 import time
 import numpy
 import matplotlib
+import json
 
 from data_structures import Stack, Queue
 matplotlib.use('Agg') # interactive backend
 import matplotlib.pyplot as plt
 from flask import Flask, jsonify, request
+from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///analyses.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db = SQLAlchemy(app)
+
+class AnalysisRecord(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    algo = db.Column(db.String(50), nullable=False)
+    start_time = db.Column(db.Integer, nullable=False)
+    end_time = db.Column(db.Integer, nullable=False)
+    items = db.Column(db.Integer, nullable=False)
+    steps = db.Column(db.Integer, nullable=False)
+    time_complexity = db.Column(db.String(20), nullable=False)
+    total_time_ms = db.Column(db.Integer, nullable=False)
+    graph_base64 = db.Column(db.Text, nullable=False)
+    
+with app.app_context():
+    db.create_all()
+
+@app.after_request
+def allow_frontend_requests(response):
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    return response
 
 # Creating the directory where image snapshots will be saved locally
 SNAPSHOT_DIR = 'static/snapshots'
 os.makedirs(SNAPSHOT_DIR, exist_ok=True)
+
+ANALYSIS_FILE = os.path.join(app.root_path, 'analysis_results.json')
 
 def time_complexity_visualizer(algorithm, n_min, n_max, n_step):
     times = []
@@ -177,11 +205,28 @@ def analyze():
     start_time = int(time.time())
     t_start_perf = time.perf_counter()
     
-    filepath, base64_img = time_complexity_visualizer(ALGOS[algo_name], n_min, n_max, step)
+    base64_img = time_complexity_visualizer(ALGOS[algo_name], n_min, n_max, step)
     
     t_end_perf = time.perf_counter()
     end_time = int(time.time())
     total_time_ms = int((t_end_perf - t_start_perf) * 1000)
+    
+    formatted_algo_name = PRETTY_NAMES.get(algo_name, algo_name)
+    complexity_str = COMPLEXITIES.get(algo_name, 'O(n)')
+    data_uri = f"data:image/jpeg;base64,{base64_img}"
+    
+    new_record = AnalysisRecord(
+        algo=formatted_algo_name,
+        start_time=start_time,
+        end_time=end_time,
+        items=n_max,
+        steps=step,
+        time_complexity=complexity_str,
+        total_time_ms=total_time_ms,
+        graph_base64=data_uri
+    )
+    db.session.add(new_record)
+    db.session.commit()
 
     return jsonify({
         'algo': PRETTY_NAMES.get(algo_name, algo_name),
@@ -193,5 +238,41 @@ def analyze():
         'time_complexity': COMPLEXITIES.get(algo_name, 'O(n)'),
         'total_time_ms': total_time_ms
     })
+    
+@app.route('/save_analysis', methods=['POST'])
+def save_analysis():
+    data = request.get_json(silent=True)
+
+    if not isinstance(data, dict):
+        return jsonify({
+            'error': 'Request body must be a JSON object.'
+        }), 400
+
+    try:
+        if os.path.exists(ANALYSIS_FILE):
+            with open(ANALYSIS_FILE, 'r', encoding='utf-8') as file:
+                analyses = json.load(file)
+        else:
+            analyses = []
+
+        if not isinstance(analyses, list):
+            analyses = []
+
+        analyses.append(data)
+
+        with open(ANALYSIS_FILE, 'w', encoding='utf-8') as file:
+            json.dump(analyses, file, indent=2)
+
+    except (OSError, json.JSONDecodeError) as error:
+        return jsonify({
+            'error': f'Could not save analysis: {error}'
+        }), 500
+
+    return jsonify({
+        'message': 'Analysis saved successfully',
+        'analysis': data,
+        'file': ANALYSIS_FILE
+    }), 201
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000, debug=True)
