@@ -210,23 +210,6 @@ def analyze():
     t_end_perf = time.perf_counter()
     end_time = int(time.time())
     total_time_ms = int((t_end_perf - t_start_perf) * 1000)
-    
-    formatted_algo_name = PRETTY_NAMES.get(algo_name, algo_name)
-    complexity_str = COMPLEXITIES.get(algo_name, 'O(n)')
-    data_uri = f"data:image/jpeg;base64,{base64_img}"
-    
-    new_record = AnalysisRecord(
-        algo=formatted_algo_name,
-        start_time=start_time,
-        end_time=end_time,
-        items=n_max,
-        steps=step,
-        time_complexity=complexity_str,
-        total_time_ms=total_time_ms,
-        graph_base64=data_uri
-    )
-    db.session.add(new_record)
-    db.session.commit()
 
     return jsonify({
         'algo': PRETTY_NAMES.get(algo_name, algo_name),
@@ -249,29 +232,39 @@ def save_analysis():
         }), 400
 
     try:
-        if os.path.exists(ANALYSIS_FILE):
-            with open(ANALYSIS_FILE, 'r', encoding='utf-8') as file:
-                analyses = json.load(file)
-        else:
-            analyses = []
+        algo = data.get('algo', 'Unknown')
+        start_time = data.get('start_time', int(time.time()))
+        end_time = data.get('end_time', int(time.time()))
+        items = data.get('items', 0)
+        steps = data.get('steps', 0)
+        time_complexity = data.get('time_complexity', 'O(n)')
+        total_time_ms = data.get('total_time_ms', 0)
+        graph_base64 = data.get('graph_base64', '')
 
-        if not isinstance(analyses, list):
-            analyses = []
+        # Save record using SQLAlchemy ORM (instead of writing to a JSON file)
+        new_record = AnalysisRecord(
+            algo=algo,
+            start_time=start_time,
+            end_time=end_time,
+            items=items,
+            steps=steps,
+            time_complexity=time_complexity,
+            total_time_ms=total_time_ms,
+            graph_base64=graph_base64
+        )
+        db.session.add(new_record)
+        db.session.commit()
 
-        analyses.append(data)
-
-        with open(ANALYSIS_FILE, 'w', encoding='utf-8') as file:
-            json.dump(analyses, file, indent=2)
-
-    except (OSError, json.JSONDecodeError) as error:
+    except Exception as error:
+        db.session.rollback()
         return jsonify({
-            'error': f'Could not save analysis: {error}'
+            'error': f'Could not save analysis to database: {error}'
         }), 500
 
     return jsonify({
-        'message': 'Analysis saved successfully',
-        'analysis': data,
-        'file': ANALYSIS_FILE
+        'message': 'Analysis saved successfully to database via SQLAlchemy',
+        'id': new_record.id,
+        'analysis': data
     }), 201
 
 if __name__ == '__main__':
