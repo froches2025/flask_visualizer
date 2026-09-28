@@ -5,6 +5,7 @@ import time
 import numpy
 import matplotlib
 import json
+import pymysql
 
 from data_structures import Stack, Queue
 matplotlib.use('Agg') # interactive backend
@@ -12,15 +13,38 @@ import matplotlib.pyplot as plt
 from flask import Flask, jsonify, request
 from flask_sqlalchemy import SQLAlchemy
 
+
 app = Flask(__name__)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///analyses.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# 1. Database credentials
+DB_USER = 'froches'
+DB_PASSWORD = 'froches_pass'
+DB_HOST = 'localhost'
+DB_NAME = 'visualizer_db'
 
+# 2. Check and Create Database if it doesn't exist
+try:
+    # Connect to MySQL server (not the specific DB yet)
+    connection = pymysql.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD)
+    cursor = connection.cursor()
+    cursor.execute(f"CREATE DATABASE IF NOT EXISTS {DB_NAME}")
+    cursor.close()
+    connection.close()
+    print(f"Database '{DB_NAME}' verified/created.")
+except Exception as e:
+    print(f"Error creating database: {e}")
+
+# 3. NOW initialize SQLAlchemy
+app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:3306/{DB_NAME}'
 db = SQLAlchemy(app)
 
+# use jwt on your save_analysis endpoint to authenticate the user and ensure that only authorized users can save analysis records. You can use Flask-JWT-Extended or any other JWT library for this purpose.
+# if a request is sent without a valid JWT token, return a 401 Unauthorized response saying "I don't know you".
+# the jwt token should be sent as a query parameter as a Bearer token like "?bearer_token=<your_token_here>".
+# do a direct comparison of the token with a hardcoded value for simplicity, but in a real application, you would want to validate it properly.
+
 class AnalysisRecord(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     algo = db.Column(db.String(50), nullable=False)
     start_time = db.Column(db.Integer, nullable=False)
     end_time = db.Column(db.Integer, nullable=False)
@@ -28,7 +52,7 @@ class AnalysisRecord(db.Model):
     steps = db.Column(db.Integer, nullable=False)
     time_complexity = db.Column(db.String(20), nullable=False)
     total_time_ms = db.Column(db.Integer, nullable=False)
-    graph_base64 = db.Column(db.Text, nullable=False)
+    graph_base64 = db.Column(db.LargeBinary, nullable=False)
     
 with app.app_context():
     db.create_all()
@@ -131,19 +155,6 @@ def list_algo(n):
 
     return len(seen_ids)
 
-# def list_algo(n):
-#     users = [{'id': i} for i in range(n)]
-#     unique_users = []
-#     for user in users:
-#         seen = False
-#         for existing_user in unique_users:
-#             if user['id'] == existing_user['id']:
-#                 seen = True
-#                 break
-#         if not seen:
-#             unique_users.append(user)
-#     return len(unique_users)
-
 def benchmark_stack_push(n):
     stack = Stack()
     for i in range(n):
@@ -205,7 +216,7 @@ def analyze():
     start_time = int(time.time())
     t_start_perf = time.perf_counter()
     
-    base64_img = time_complexity_visualizer(ALGOS[algo_name], n_min, n_max, step)
+    _, base64_img = time_complexity_visualizer(ALGOS[algo_name], n_min, n_max, step)
     
     t_end_perf = time.perf_counter()
     end_time = int(time.time())
