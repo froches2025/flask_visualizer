@@ -73,7 +73,7 @@
         <p class="intro">Choose an operation, set the input range, and let the Flask backend measure it. Your result and its plotted curve will appear here.</p>
 
         <section class="workspace">
-            <form class="panel controls" id="analysis-form">
+            <form class="panel controls" id="analysis-form" onsubmit="return false;">
                 <h2>Run an analysis</h2>
                 <label for="algorithm">Algorithm</label>
                 <select id="algorithm" name="algo" required>
@@ -125,6 +125,7 @@
 
         form.addEventListener('submit', async (event) => {
             event.preventDefault();
+            event.stopPropagation();
             const values = new FormData(form);
             console.log("Values:", values);
             const params = new URLSearchParams(values);

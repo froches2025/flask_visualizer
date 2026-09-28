@@ -21,6 +21,7 @@ DB_USER = 'froches'
 DB_PASSWORD = 'froches_pass'
 DB_HOST = 'localhost'
 DB_NAME = 'visualizer_db'
+EXPECTED_BEARER_TOKEN = 'flask-visualizer-save-token'
 
 # 2. Check and Create Database if it doesn't exist
 try:
@@ -38,10 +39,6 @@ except Exception as e:
 app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:3306/{DB_NAME}'
 db = SQLAlchemy(app)
 
-# use jwt on your save_analysis endpoint to authenticate the user and ensure that only authorized users can save analysis records. You can use Flask-JWT-Extended or any other JWT library for this purpose.
-# if a request is sent without a valid JWT token, return a 401 Unauthorized response saying "I don't know you".
-# the jwt token should be sent as a query parameter as a Bearer token like "?bearer_token=<your_token_here>".
-# do a direct comparison of the token with a hardcoded value for simplicity, but in a real application, you would want to validate it properly.
 
 class AnalysisRecord(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -52,7 +49,7 @@ class AnalysisRecord(db.Model):
     steps = db.Column(db.Integer, nullable=False)
     time_complexity = db.Column(db.String(20), nullable=False)
     total_time_ms = db.Column(db.Integer, nullable=False)
-    graph_base64 = db.Column(db.LargeBinary, nullable=False)
+    graph_base64 = db.Column(db.Text, nullable=False)
     
 with app.app_context():
     db.create_all()
@@ -235,6 +232,9 @@ def analyze():
     
 @app.route('/save_analysis', methods=['POST'])
 def save_analysis():
+    if request.args.get('bearer_token') != EXPECTED_BEARER_TOKEN:
+        return jsonify({'error': "I don't know you"}), 401
+
     data = request.get_json(silent=True)
 
     if not isinstance(data, dict):
